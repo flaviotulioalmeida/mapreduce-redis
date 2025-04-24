@@ -38,7 +38,7 @@ The system consists of the following components:
 1. Clone the repository:
 
 \`\`\`bash
-git clone https://github.com/yourusername/mapreduce-redis.git
+git clone https://github.com/flaviotulioalmeida/mapreduce-redis.git
 cd mapreduce-redis
 \`\`\`
 
