@@ -1,0 +1,87 @@
+version: '3'
+
+services:
+  redis:
+    image: redis:latest
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+
+  coordinator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      - redis
+    volumes:
+      - ./data:/app/data
+      - ./chunks:/app/chunks
+      - ./intermediate:/app/intermediate
+      - ./reducer_input:/app/reducer_input
+      - ./output:/app/output
+    command: python coordinator.py --redis-host=redis --input-file=/app/data/data.txt
+
+  mapper1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      - redis
+      - coordinator
+    volumes:
+      - ./chunks:/app/chunks
+      - ./intermediate:/app/intermediate
+    command: python mapper.py --redis-host=redis --worker-id=mapper-1
+
+  mapper2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      - redis
+      - coordinator
+    volumes:
+      - ./chunks:/app/chunks
+      - ./intermediate:/app/intermediate
+    command: python mapper.py --redis-host=redis --worker-id=mapper-2
+
+  mapper3:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      - redis
+      - coordinator
+    volumes:
+      - ./chunks:/app/chunks
+      - ./intermediate:/app/intermediate
+    command: python mapper.py --redis-host=redis --worker-id=mapper-3
+
+  reducer1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      - redis
+      - coordinator
+    volumes:
+      - ./reducer_input:/app/reducer_input
+      - ./output:/app/output
+    command: python reducer.py --redis-host=redis --worker-id=reducer-1
+
+  reducer2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      - redis
+      - coordinator
+    volumes:
+      - ./reducer_input:/app/reducer_input
+      - ./output:/app/output
+    command: python reducer.py --redis-host=redis --worker-id=reducer-2
+
+volumes:
+  redis-data:

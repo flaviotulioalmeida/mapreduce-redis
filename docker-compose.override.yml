@@ -1,0 +1,15 @@
+version: '3'
+
+services:
+  data-generator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./data:/app/data
+    command: python data_generator.py --size-mb 100 --output-file=/app/data/data.txt
+    
+  coordinator:
+    depends_on:
+      - redis
+      - data-generator
