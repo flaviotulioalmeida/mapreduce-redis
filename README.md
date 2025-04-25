@@ -1,190 +1,167 @@
-# MapReduce with Redis - Distributed Systems Implementation
+# MapReduce com Redis - Implementação de Sistema Distribuído
 
-This project implements a distributed MapReduce system using Redis for task coordination and message passing. The system simulates a cluster of mappers and reducers that process data collaboratively in multiple stages: Map, Shuffle, and Reduce.
+## Visão Geral
 
-## Architecture
+Este projeto implementa um sistema MapReduce distribuído utilizando Redis para coordenação de tarefas. O sistema processa grandes volumes de dados dividindo-os em partes menores, processando-as em paralelo e combinando os resultados, permitindo análise eficiente de dados em escala.
 
-The system consists of the following components:
+## O que é MapReduce?
 
-1. **Coordinator**: Orchestrates the entire MapReduce process, including splitting the input file, pushing tasks to Redis queues, and merging the final results.
+MapReduce é um modelo de programação para processamento e geração de grandes conjuntos de dados. O modelo consiste em duas operações principais:
 
-2. **Mapper Workers**: Process chunks of the input file and emit key-value pairs.
+- **Map**: Processa pares chave/valor de entrada para gerar pares chave/valor intermediários.
+- **Reduce**: Mescla todos os valores intermediários associados à mesma chave.
 
-3. **Shuffler**: Groups values by key and partitions them for reducers.
+Este paradigma permite o processamento distribuído de grandes volumes de dados de forma escalável e tolerante a falhas.
 
-4. **Reducer Workers**: Process grouped key-value pairs and produce the final output.
+## Arquitetura do Sistema
 
-5. **Redis**: Used for task coordination, message passing, and worker communication.
+O sistema é composto pelos seguintes componentes:
 
-### System Flow
+1. **Coordinator (Coordenador)**: Orquestra todo o processo MapReduce
+   - Divide o arquivo de entrada em chunks
+   - Gerencia as filas de tarefas
+   - Monitora o progresso dos workers
+   - Aciona a fase de shuffle
+   - Mescla os resultados finais
 
-1. The coordinator splits the input file into chunks.
-2. Mapper tasks are pushed to a Redis queue.
-3. Mapper workers fetch tasks from the queue and process them.
-4. After all mappers finish, the shuffler groups values by key.
-5. Reducer tasks are pushed to a Redis queue.
-6. Reducer workers fetch tasks from the queue and process them.
-7. The coordinator merges all reducer outputs into a final result.
+2. **Mapper Workers**: Processam os chunks de dados
+   - Leem os chunks atribuídos
+   - Aplicam a função Map (geram pares chave/valor)
+   - Escrevem resultados intermediários
 
-## Requirements
+3. **Shuffler**: Reorganiza os dados após a fase Map
+   - Lê todos os resultados intermediários
+   - Agrupa valores pela mesma chave
+   - Particiona os dados para os reducers
 
-- Python 3.6+
-- Redis server
-- Python packages:
-  - redis
+4. **Reducer Workers**: Agregam os valores por chave
+   - Processam os dados agrupados
+   - Aplicam a função Reduce
+   - Produzem resultados finais
 
-## Installation
+5. **Redis**: Sistema de coordenação centralizada
+   - Gerencia filas de tarefas
+   - Facilita comunicação entre componentes
+   - Mantém contadores e estados
 
-1. Clone the repository:
+## Fluxo de Execução
 
-\`\`\`bash
+1. O arquivo de entrada é dividido em **N** chunks de tamanho aproximadamente igual.
+2. Os chunks são colocados em uma fila no Redis.
+3. Os Mapper Workers consomem chunks da fila e geram resultados intermediários.
+4. Após todos os mappers concluírem, o Shuffler agrupa os dados por chave.
+5. Os dados agrupados são divididos em **R** partições para os reducers.
+6. Os Reducer Workers processam as partições e geram resultados finais.
+7. O Coordinator combina todos os resultados dos reducers.
+
+## Pré-requisitos
+
+- Docker e Docker Compose (para execução com contêineres)
+- Ou, para execução local:
+  - Python 3.6+
+  - Redis Server
+  - Pacote Python: `redis`
+
+## Como Executar o Sistema
+
+### Método 1: Usando Docker (Recomendado)
+
+#### Passo 1: Preparação do Ambiente
+
+```bash
 git clone https://github.com/flaviotulioalmeida/mapreduce-redis.git
 cd mapreduce-redis
-\`\`\`
+```
 
-2. Install the required Python packages:
+#### Passo 2: Iniciar o Sistema
 
-\`\`\`bash
-pip install -r requirements.txt
-\`\`\`
+```bash
+docker-compose up --build
+```
 
-3. Install and start Redis server:
+#### Passo 3: Acompanhar a Execução
 
+```plaintext
+coordinator-1  | Splitting input file /app/data/data.txt into 10 chunks
+coordinator-1  | Created chunks/chunk0.txt ... chunks/chunk9.txt
+coordinator-1  | Pushing mapper tasks to Redis queue
+...
+coordinator-1  | Final result written to finalresult.txt
+```
 
-\`\`\`bash
-# On Ubuntu/Debian
+#### Passo 4: Visualizar os Resultados
+
+```bash
+docker-compose up -d coordinator
+docker-compose exec coordinator cat finalresult.txt | head -20
+```
+
+#### Passo 5: Copiar os Resultados para o Sistema Local (Opcional)
+
+```bash
+CONTAINER_ID=$(docker-compose ps -q coordinator)
+docker cp $CONTAINER_ID:/app/finalresult.txt ./finalresult.txt
+cat finalresult.txt | head -20
+```
+
+#### Passo 6: Encerrar o Sistema
+
+```bash
+docker-compose down
+docker-compose down -v
+```
+
+### Método 2: Execução Local (Sem Docker)
+
+#### Passo 1: Instalar Dependências
+
+```bash
+pip install redis
 sudo apt-get install redis-server
 sudo systemctl start redis-server
+```
 
-# On macOS with Homebrew
-brew install redis
-brew services start redis
+#### Passo 2: Gerar Dados de Teste
 
-# On Windows, download and install Redis from https://github.com/tporadowski/redis/releases
-\`\`\`
+```bash
+mkdir -p data
+python data_generator.py --size-mb 100 --output-file data/data.txt
+```
 
-## Usage
+#### Passo 3: Iniciar o Coordenador
 
-### 1. Generate Test Data
+```bash
+python coordinator.py --input-file data/data.txt --num-chunks 10 --num-reducers 5
+```
 
+#### Passo 4: Iniciar os Workers
 
-First, generate a large text file for testing:
-
-\`\`\`bash
-python data_generator.py --size-mb 1000 --output-file data.txt
-\`\`\`
-
-This will create a 1GB text file with random words.
-
-### 2. Run the MapReduce Job
-
-You can run the entire MapReduce job using the coordinator:
-
-\`\`\`bash
-python coordinator.py --input-file data.txt --num-chunks 10 --num-reducers 5
-\`\`\`
-
-### 3. Run Workers Separately
-
-Alternatively, you can run the coordinator and workers separately:
-
-1. Start the coordinator:
-
-\`\`\`bash
-python coordinator.py --input-file data.txt
-\`\`\`
-
-2. Start multiple mapper workers:
-
-\`\`\`bash
+```bash
 python run_workers.py --num-mappers 3 --num-reducers 2
-\`\`\`
+```
 
-### 4. Monitor the Progress
+#### Passo 5: Monitorar o Progresso (Opcional)
 
-You can monitor the progress of the MapReduce job using the monitoring dashboard:
-
-\`\`\`bash
+```bash
 python monitor.py
-\`\`\`
+```
 
-### 5. Using Docker
+#### Passo 6: Visualizar os Resultados
 
-You can also run the entire system using Docker Compose:
+```bash
+head -20 finalresult.txt
+```
 
-\`\`\`bash
-docker-compose up --build
-\`\`\`
+## Análise dos Resultados
 
-This will start Redis, the coordinator, and multiple mapper and reducer workers.
+### Formato dos Resultados
 
-## Project Structure
+```plaintext
+palavra  contagem
+```
 
-- `coordinator.py`: Orchestrates the entire MapReduce process
-- `file_splitter.py`: Splits the input file into chunks
-- `mapper.py`: Implements mapper workers
-- `shuffler.py`: Implements the shuffle phase
-- `reducer.py`: Implements reducer workers
-- `run_workers.py`: Starts multiple mapper and reducer workers
-- `monitor.py`: Provides a monitoring dashboard
-- `data_generator.py`: Generates test data
-- `docker-compose.yml`: Docker Compose configuration
-- `Dockerfile`: Docker configuration
-- `requirements.txt`: Python dependencies
+### Interpretação dos Resultados
 
-## Customization
+- Em arquivos com distribuição uniforme, as contagens são similares.
+- Em textos reais, a distribuição segue a Lei de Zipf, com poucas palavras muito frequentes e muitas palavras raras.
 
-### Changing the Map and Reduce Functions
-
-You can customize the map and reduce functions in `mapper.py` and `reducer.py` respectively:
-
-- `map_function` in `mapper.py`: Currently implements word count by emitting (word, 1) for each word.
-- `reduce_function` in `reducer.py`: Currently implements sum by adding all values for each key.
-
-### Scaling the System
-
-You can scale the system by adjusting the number of chunks and reducers:
-
-\`\`\`bash
-python coordinator.py --num-chunks 20 --num-reducers 10
-\`\`\`
-
-Or by running more worker processes:
-
-\`\`\`bash
-python run_workers.py --num-mappers 5 --num-reducers 3
-\`\`\`
-
-## Bonus Features
-
-This implementation includes several bonus features:
-
-1. **Redis Pub/Sub**: Used for notifying when tasks are complete.
-2. **Retry Logic**: Failed tasks are pushed back to the queue for retry.
-3. **Progress Monitoring**: A simple monitoring dashboard shows the progress of mapper and reducer tasks.
-4. **Docker Support**: Docker and Docker Compose are used to simulate multiple workers.
-
-## Troubleshooting
-
-### Redis Connection Issues
-
-If you encounter Redis connection issues, make sure the Redis server is running:
-
-\`\`\`bash
-redis-cli ping
-\`\`\`
-
-Should return `PONG`.
-
-### File Permissions
-
-If you encounter file permission issues, make sure the directories have the correct permissions:
-
-\`\`\`bash
-mkdir -p chunks intermediate reducer_input output
-chmod 777 chunks intermediate reducer_input output
-\`\`\`
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
