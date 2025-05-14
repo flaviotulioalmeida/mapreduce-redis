@@ -76,7 +76,7 @@ cd mapreduce-redis
 #### Passo 2: Iniciar o Sistema
 
 ```bash
-docker-compose up --build
+docker compose up --build
 ```
 
 #### Passo 3: Acompanhar a Execução
@@ -92,8 +92,8 @@ coordinator-1  | Final result written to finalresult.txt
 #### Passo 4: Visualizar os Resultados
 
 ```bash
-docker-compose up -d coordinator
-docker-compose exec coordinator cat finalresult.txt | head -20
+docker compose up -d coordinator
+docker compose exec coordinator cat finalresult.txt | head -20
 ```
 
 #### Passo 5: Copiar os Resultados para o Sistema Local (Opcional)
@@ -107,8 +107,8 @@ cat finalresult.txt | head -20
 #### Passo 6: Encerrar o Sistema
 
 ```bash
-docker-compose down
-docker-compose down -v
+docker compose down
+docker compose down -v
 ```
 
 ### Método 2: Execução Local (Sem Docker)
